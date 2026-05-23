@@ -1,0 +1,56 @@
+name: AI Superstar Digest
+
+on:
+  schedule:
+    # Every Monday at 7:00 AM Mountain Time (= 14:00 UTC)
+    - cron: "0 14 * * 1"
+    # Every Thursday at 7:00 AM Mountain Time (= 14:00 UTC)
+    - cron: "0 14 * * 4"
+  # Allow manual trigger from GitHub UI for testing
+  workflow_dispatch:
+
+jobs:
+  send-digest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-digest
+
+      - name: Install dependencies
+        run: pip install feedparser requests
+
+      # Restore the seen-URLs cache between runs
+      - name: Restore URL cache
+        uses: actions/cache@v4
+        with:
+          path: seen_urls.json
+          key: seen-urls-${{ github.run_id }}
+          restore-keys: seen-urls-
+
+      - name: Run digest
+        env:
+          GMAIL_USER:      ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASS:  ${{ secrets.GMAIL_APP_PASS }}
+          TO_EMAIL:        ${{ secrets.TO_EMAIL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}  # optional
+        run: python digest.py
+
+      # Save updated URL cache
+      - name: Save URL cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: seen_urls.json
+          key: seen-urls-${{ github.run_id }}
